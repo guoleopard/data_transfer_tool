@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <el-container style="min-height: 100vh;">
+    <el-container style="height: 100%; padding: 0; margin: 0;">
       <el-header style="background-color: #2f4050; color: white;">
         <h1 style="margin: 0;">数据库迁移工具</h1>
       </el-header>

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
@@ -7,6 +8,20 @@ from datetime import datetime
 import os
 
 app = FastAPI(title="数据迁移工具后端服务")
+
+# 配置CORS中间件
+origins = [
+    "http://localhost:5173",  # 前端开发服务器地址
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 数据库配置 - 使用SQLite作为示例，实际使用时可配置为MySQL或SQL Server
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data_transfer.db"
