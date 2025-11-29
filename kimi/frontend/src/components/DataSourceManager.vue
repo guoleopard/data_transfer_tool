@@ -33,8 +33,8 @@
           <div class="info-item">
             <el-icon><Coin /></el-icon>
             <span class="info-label">类型：</span>
-            <el-tag :type="ds.type === 'mysql' ? 'success' : 'primary'" size="small">
-              {{ ds.type === 'mysql' ? 'MySQL' : 'SQL Server' }}
+            <el-tag :type="ds.db_type === 'mysql' ? 'success' : 'primary'" size="small">
+              {{ ds.db_type === 'mysql' ? 'MySQL' : 'SQL Server' }}
             </el-tag>
           </div>
           <div class="info-item">
@@ -79,8 +79,11 @@
         <el-form-item label="数据源名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入数据源名称" />
         </el-form-item>
-        <el-form-item label="数据库类型" prop="type">
-          <el-select v-model="formData.type" placeholder="请选择数据库类型">
+        <el-form-item label="描述" prop="description">
+          <el-input v-model="formData.description" placeholder="请输入数据源描述" />
+        </el-form-item>
+        <el-form-item label="数据库类型" prop="db_type">
+          <el-select v-model="formData.db_type" placeholder="请选择数据库类型">
             <el-option label="MySQL" value="mysql" />
             <el-option label="SQL Server" value="sqlserver" />
           </el-select>
@@ -99,6 +102,9 @@
         </el-form-item>
         <el-form-item label="数据库名" prop="database">
           <el-input v-model="formData.database" placeholder="请输入数据库名" />
+        </el-form-item>
+        <el-form-item label="状态" prop="is_active">
+          <el-switch v-model="formData.is_active" active-text="启用" inactive-text="禁用" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -133,18 +139,20 @@ const dataSourceForm = ref(null)
 // 表单数据
 const formData = reactive({
   name: '',
-  type: 'mysql',
+  db_type: 'mysql',
   host: 'localhost',
   port: 3306,
   username: 'root',
   password: '',
-  database: ''
+  database: '',
+  description: '',
+  is_active: true
 })
 
 // 表单验证规则
 const formRules = {
   name: [{ required: true, message: '请输入数据源名称', trigger: 'blur' }],
-  type: [{ required: true, message: '请选择数据库类型', trigger: 'change' }],
+  db_type: [{ required: true, message: '请选择数据库类型', trigger: 'change' }],
   host: [{ required: true, message: '请输入主机地址', trigger: 'blur' }],
   port: [{ required: true, message: '请输入端口', trigger: 'blur' }],
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -220,12 +228,14 @@ const editDataSource = (dataSource) => {
   editingDataSource.value = dataSource
   Object.assign(formData, {
     name: dataSource.name,
-    type: dataSource.type,
+    db_type: dataSource.db_type,
     host: dataSource.host,
     port: dataSource.port,
     username: dataSource.username,
     password: dataSource.password,
-    database: dataSource.database
+    database: dataSource.database,
+    description: dataSource.description || '',
+    is_active: dataSource.is_active !== undefined ? dataSource.is_active : true
   })
   showAddDialog.value = true
 }
@@ -259,12 +269,14 @@ const resetForm = () => {
   editingDataSource.value = null
   Object.assign(formData, {
     name: '',
-    type: 'mysql',
+    db_type: 'mysql',
     host: 'localhost',
     port: 3306,
     username: 'root',
     password: '',
-    database: ''
+    database: '',
+    description: '',
+    is_active: true
   })
   if (dataSourceForm.value) {
     dataSourceForm.value.clearValidate()
