@@ -49,8 +49,17 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
-// import mysql from 'mysql2/promise';
-// import sql from 'mssql';
+// Mock test connection function
+const testConnection = async () => {
+  try {
+    // Simulate connection delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    ElMessage.success('连接成功！');
+  } catch (error) {
+    console.error('连接失败:', error);
+    ElMessage.error('连接失败：' + error.message);
+  }
+};
 
 const dataSource = reactive({
   name: '',

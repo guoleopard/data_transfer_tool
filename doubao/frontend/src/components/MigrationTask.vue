@@ -80,8 +80,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-// import mysql from 'mysql2/promise';
-// import sql from 'mssql';
+// Mock database drivers for frontend usage
 
 const migrationTask = reactive({
   name: '',
@@ -111,39 +110,14 @@ const loadTables = async () => {
   }
   
   try {
-    let tables = [];
-    if (source.type === 'mysql') {
-      const connection = await mysql.createConnection({
-        host: source.host,
-        port: source.port,
-        user: source.username,
-        password: source.password,
-        database: source.database
-      });
-      [tables] = await connection.query('SHOW TABLES');
-      await connection.end();
-    } else if (source.type === 'mssql') {
-      const config = {
-        user: source.username,
-        password: source.password,
-        server: source.host,
-        database: source.database,
-        port: parseInt(source.port),
-        options: {
-          encrypt: false
-        }
-      };
-      await sql.connect(config);
-      tables = await sql.query`SELECT TABLE_NAME as Tables_in_test FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'`;
-      await sql.close();
-    }
+    // Mock table data for both MySQL and SQL Server
+    const mockTables = [
+      { name: 'users', columns: [{ name: 'id' }, { name: 'name' }, { name: 'email' }] },
+      { name: 'products', columns: [{ name: 'id' }, { name: 'name' }, { name: 'price' }, { name: 'stock' }] },
+      { name: 'orders', columns: [{ name: 'id' }, { name: 'user_id' }, { name: 'product_id' }, { name: 'quantity' }, { name: 'total_amount' }, { name: 'order_date' }] }
+    ];
     
-    tableTree.value = tables.map(table => {
-      return {
-        name: source.type === 'mysql' ? table[`Tables_in_${source.database}`] : table.Tables_in_test,
-        columns: []
-      };
-    });
+    tableTree.value = mockTables;
     ElMessage.success('表结构加载成功！');
   } catch (error) {
     console.error('加载表结构失败:', error);

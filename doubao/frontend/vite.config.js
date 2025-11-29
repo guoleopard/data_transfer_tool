@@ -6,13 +6,16 @@ import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfil
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
+    include: ['mssql', 'tedious'],
     esbuildOptions: {
       define: {
         global: 'globalThis',
       },
       plugins: [
         NodeGlobalsPolyfillPlugin({
-          buffer: true
+          buffer: true,
+          process: true,
+          events: true
         })
       ]
     }
