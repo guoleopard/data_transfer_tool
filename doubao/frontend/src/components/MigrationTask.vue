@@ -8,7 +8,7 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="源数据源">
-            <el-select v-model="migrationTask.sourceId" placeholder="请选择源数据源">
+            <el-select v-model="migrationTask.source_id" placeholder="请选择源数据源">
               <el-option
                 v-for="source in dataSources"
                 :key="source.id"
@@ -20,7 +20,7 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="目标数据源">
-            <el-select v-model="migrationTask.targetId" placeholder="请选择目标数据源">
+            <el-select v-model="migrationTask.target_id" placeholder="请选择目标数据源">
               <el-option
                 v-for="target in dataSources"
                 :key="target.id"
@@ -103,13 +103,13 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getDataSourceList, createMigrationTask, getMigrationTaskList, getMigrationTaskById, startMigrationTask, stopMigrationTask } from '../api';
+import { getDataSourceList, createMigrationTask, getMigrationTaskList, getMigrationTaskById, updateMigrationTask, startMigrationTask, stopMigrationTask, deleteMigrationTask } from '../api';
 
 const migrationTask = reactive({
   id: null,
   name: '',
-  sourceId: null,
-  targetId: null,
+  source_id: null,
+  target_id: null,
   migrate_structure: true,
   migrate_records: true,
   table_names: ''
@@ -145,7 +145,7 @@ const loadMigrationTaskList = async () => {
 
 // 加载表结构 - 暂时使用模拟实现
 const loadTables = async () => {
-  if (!migrationTask.sourceId) {
+  if (!migrationTask.source_id) {
     ElMessage.warning('请先选择源数据源');
     return;
   }
@@ -172,11 +172,11 @@ const saveMigrationTask = async () => {
     ElMessage.warning('请输入任务名称');
     return;
   }
-  if (!migrationTask.sourceId || !migrationTask.targetId) {
+  if (!migrationTask.source_id || !migrationTask.target_id) {
     ElMessage.warning('请选择源数据源和目标数据源');
     return;
   }
-  if (migrationTask.sourceId === migrationTask.targetId) {
+  if (migrationTask.source_id === migrationTask.target_id) {
     ElMessage.warning('源数据源和目标数据源不能相同');
     return;
   }
@@ -313,6 +313,9 @@ const resetTask = () => {
 // 编辑任务
 const editTask = (task) => {
   Object.assign(migrationTask, task);
+  // 确保字段名正确
+  if (task.sourceId) migrationTask.source_id = task.sourceId;
+  if (task.targetId) migrationTask.target_id = task.targetId;
   currentEditingTask.value = task.id;
   
   // 如果有选中的表，设置树的选中状态

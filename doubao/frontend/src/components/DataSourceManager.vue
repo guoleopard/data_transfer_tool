@@ -8,7 +8,7 @@
       <el-form-item label="数据库类型">
         <el-select v-model="dataSource.type" placeholder="请选择数据库类型">
           <el-option label="MySQL" value="mysql"></el-option>
-          <el-option label="SQL Server" value="mssql"></el-option>
+          <el-option label="SQL Server" value="sqlserver"></el-option>
         </el-select>
       </el-form-item>
       <el-form-item label="主机地址">
