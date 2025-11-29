@@ -1,0 +1,40 @@
+# 忽略虚拟环境目录
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 忽略数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 忽略日志文件
+*.log
+logs/
+
+# 忽略环境变量文件
+.env
+
+# 忽略IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 忽略操作系统文件
+.DS_Store
+Thumbs.db
+
+# 忽略临时文件
+*.tmp
+*.temp
+*.bak
+
+# 忽略构建文件
+build/
+dist/
+*.egg-info/
