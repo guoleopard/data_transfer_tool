@@ -23,7 +23,7 @@
         </el-aside>
         <el-main style="background-color: #f3f3f4;">
           <DataSourceManager v-if="activeMenu === 'dataSource'" />
-          <MigrationTask v-if="activeMenu === 'migration'" />
+          <MigrationTaskManager v-if="activeMenu === 'migration'" />
         </el-main>
       </el-container>
     </el-container>
@@ -33,7 +33,7 @@
 <script setup>
 import { ref } from 'vue';
 import DataSourceManager from './components/DataSourceManager.vue';
-import MigrationTask from './components/MigrationTask.vue';
+import MigrationTaskManager from './components/MigrationTaskManager.vue';
 import { DataAnalysis, DataLine } from '@element-plus/icons-vue';
 import ElementPlus from 'element-plus';
 import 'element-plus/dist/index.css';

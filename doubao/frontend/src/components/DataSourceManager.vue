@@ -8,7 +8,7 @@
       <el-form-item label="数据库类型">
         <el-select v-model="dataSource.type" placeholder="请选择数据库类型">
           <el-option label="MySQL" value="mysql"></el-option>
-          <el-option label="SQL Server" value="mssql"></el-option>
+          <el-option label="SQL Server" value="sqlserver"></el-option>
         </el-select>
       </el-form-item>
       <el-form-item label="主机地址">
@@ -47,17 +47,19 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-// Mock test connection function
+import { dataSourceApi } from '../utils/api.js';
+
+// 测试连接函数
 const testConnection = async () => {
   try {
-    // Simulate connection delay
+    // 这里可以添加连接测试的API调用
     await new Promise(resolve => setTimeout(resolve, 1000));
     ElMessage.success('连接成功！');
   } catch (error) {
     console.error('连接失败:', error);
-    ElMessage.error('连接失败：' + error.message);
+    ElMessage.error('连接失败：' + (error.response?.data?.detail || error.message));
   }
 };
 
@@ -71,10 +73,23 @@ const dataSource = reactive({
   password: ''
 });
 
-const dataSources = ref([
-  // 示例数据源
-  { name: '本地MySQL', type: 'mysql', host: 'localhost', port: 3306, database: 'test', username: 'root', password: '' }
-]);
+const dataSources = ref([]);
+
+// 加载数据源列表
+const loadDataSources = async () => {
+  try {
+    const response = await dataSourceApi.list();
+    dataSources.value = response;
+  } catch (error) {
+    console.error('加载数据源失败:', error);
+    ElMessage.error('加载数据源失败：' + error.message);
+  }
+};
+
+// 页面加载时加载数据源
+onMounted(() => {
+  loadDataSources();
+});
 
 // const testConnection = async () => {
 //   try {
@@ -109,34 +124,46 @@ const dataSources = ref([
 //   }
 // };
 
-const saveDataSource = () => {
+const saveDataSource = async () => {
   if (!dataSource.name) {
     ElMessage.warning('请输入数据源名称');
     return;
   }
-  dataSources.value.push({ ...dataSource });
-  ElMessage.success('数据源保存成功！');
-  // 重置表单
-  Object.assign(dataSource, {
-    name: '',
-    type: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    database: '',
-    username: 'root',
-    password: ''
-  });
+  
+  try {
+    await dataSourceApi.create(dataSource);
+    ElMessage.success('数据源保存成功！');
+    // 重置表单
+    Object.assign(dataSource, {
+      name: '',
+      type: 'mysql',
+      host: 'localhost',
+      port: 3306,
+      database: '',
+      username: 'root',
+      password: ''
+    });
+    // 重新加载数据源列表
+    loadDataSources();
+  } catch (error) {
+    console.error('保存数据源失败:', error);
+    ElMessage.error('保存数据源失败：' + error.message);
+  }
 };
 
 const editDataSource = (row) => {
   Object.assign(dataSource, row);
 };
 
-const deleteDataSource = (row) => {
-  const index = dataSources.value.indexOf(row);
-  if (index > -1) {
-    dataSources.value.splice(index, 1);
+const deleteDataSource = async (row) => {
+  try {
+    await dataSourceApi.delete(row.id);
     ElMessage.success('数据源删除成功！');
+    // 重新加载数据源列表
+    loadDataSources();
+  } catch (error) {
+    console.error('删除数据源失败:', error);
+    ElMessage.error('删除数据源失败：' + error.message);
   }
 };
 </script>
