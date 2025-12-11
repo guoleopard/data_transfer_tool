@@ -4,8 +4,12 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import inspect
 from datetime import datetime
 import os
+import pymysql
+import pyodbc
+from typing import List
 
 app = FastAPI(title="数据迁移工具后端服务")
 
@@ -162,6 +166,32 @@ def delete_data_source(source_id: int, db: Session = Depends(get_db)):
     db.delete(source)
     db.commit()
     return {"id": source_id, "message": "数据源删除成功"}
+
+# 获取数据源表列表
+@app.get("/api/data_sources/{source_id}/tables", response_model=List[str])
+def get_data_source_tables(source_id: int, db: Session = Depends(get_db)):
+    source = db.query(DataSource).filter(DataSource.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="数据源不存在")
+    
+    try:
+        if source.type == "mysql":
+            # 连接MySQL数据库
+            engine = create_engine(f"mysql+pymysql://{source.username}:{source.password}@{source.host}:{source.port}/{source.database}")
+        elif source.type == "sqlserver":
+            # 连接SQL Server数据库
+            connection_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={source.host},{source.port};DATABASE={source.database};UID={source.username};PWD={source.password}"
+            engine = create_engine(f"mssql+pyodbc:///?odbc_connect={connection_string}")
+        else:
+            raise HTTPException(status_code=400, detail="不支持的数据库类型")
+        
+        # 获取表列表
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        return tables
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取表列表失败: {str(e)}")
 
 # 数据迁移任务管理API
 @app.post("/api/migration_tasks/", response_model=dict)

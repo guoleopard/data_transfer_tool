@@ -16,7 +16,15 @@
         </el-select>
       </el-form-item>
       <el-form-item label="迁移表名">
-        <el-input v-model="migrationTask.table_names" placeholder="请输入表名（逗号分隔）"></el-input>
+        <div v-if="selectedSourceTables.length > 0" class="table-selection">
+          <el-checkbox-group v-model="selectedTables">
+            <el-checkbox v-for="table in selectedSourceTables" :key="table" :label="table">{{ table }}</el-checkbox>
+          </el-checkbox-group>
+        </div>
+        <div v-else class="no-tables">
+          <el-input v-model="migrationTask.table_names" placeholder="请输入表名（逗号分隔）" disabled></el-input>
+          <span v-if="migrationTask.source_id" style="color: #909399; font-size: 12px; margin-left: 10px;">请先选择源数据源</span>
+        </div>
       </el-form-item>
       <el-form-item label="迁移选项">
         <el-checkbox v-model="migrationTask.migrate_structure">迁移表结构</el-checkbox>
@@ -44,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { dataSourceApi, migrationTaskApi } from '../utils/api.js';
 
@@ -59,6 +67,8 @@ const migrationTask = reactive({
 
 const dataSources = ref([]);
 const migrationTasks = ref([]);
+const selectedSourceTables = ref([]);
+const selectedTables = ref([]);
 
 // 加载数据源列表
 const loadDataSources = async () => {
@@ -68,6 +78,18 @@ const loadDataSources = async () => {
   } catch (error) {
     console.error('加载数据源失败:', error);
     ElMessage.error('加载数据源失败：' + error.message);
+  }
+};
+
+// 加载源数据源表列表
+const loadSourceTables = async (sourceId) => {
+  try {
+    const response = await dataSourceApi.getTables(sourceId);
+    selectedSourceTables.value = response;
+    selectedTables.value = [];
+  } catch (error) {
+    console.error('加载数据源表失败:', error);
+    ElMessage.error('加载数据源表失败：' + error.message);
   }
 };
 
@@ -81,6 +103,21 @@ const loadMigrationTasks = async () => {
     ElMessage.error('加载迁移任务失败：' + error.message);
   }
 };
+
+// 监听源数据源变化，加载表列表
+watch(() => migrationTask.source_id, (newSourceId) => {
+  if (newSourceId) {
+    loadSourceTables(newSourceId);
+  } else {
+    selectedSourceTables.value = [];
+    selectedTables.value = [];
+  }
+});
+
+// 监听选中表变化，更新table_names
+watch(selectedTables, (newSelectedTables) => {
+  migrationTask.table_names = newSelectedTables.join(',');
+}, { deep: true });
 
 // 页面加载时加载数据
 onMounted(() => {
@@ -102,6 +139,10 @@ const saveMigrationTask = async () => {
     ElMessage.warning('请选择目标数据源');
     return;
   }
+  if (migrationTask.table_names.trim() === '') {
+    ElMessage.warning('请选择或输入要迁移的表名');
+    return;
+  }
   
   try {
     await migrationTaskApi.create(migrationTask);
@@ -115,6 +156,7 @@ const saveMigrationTask = async () => {
       migrate_structure: true,
       migrate_records: true
     });
+    selectedTables.value = [];
     // 重新加载迁移任务列表
     loadMigrationTasks();
   } catch (error) {
@@ -180,5 +222,21 @@ const deleteMigrationTask = async (row) => {
 
 .el-checkbox {
   margin-right: 20px;
+  margin-bottom: 10px;
+}
+
+.table-selection {
+  display: flex;
+  flex-wrap: wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.no-tables {
+  display: flex;
+  align-items: center;
 }
 </style>
