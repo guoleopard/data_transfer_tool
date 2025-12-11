@@ -80,7 +80,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-// Mock database drivers for frontend usage
+import { dataSourceApi, migrationTaskApi } from '../api/api';
 
 const migrationTask = reactive({
   name: '',
@@ -90,9 +90,7 @@ const migrationTask = reactive({
   tables: []
 });
 
-const dataSources = ref([
-  { name: '本地MySQL', type: 'mysql', host: 'localhost', port: 3306, database: 'test', username: 'root', password: '' }
-]);
+const dataSources = ref([]);
 
 const tableTree = ref([]);
 const tableTreeRef = ref();
@@ -110,14 +108,9 @@ const loadTables = async () => {
   }
   
   try {
-    // Mock table data for both MySQL and SQL Server
-    const mockTables = [
-      { name: 'users', columns: [{ name: 'id' }, { name: 'name' }, { name: 'email' }] },
-      { name: 'products', columns: [{ name: 'id' }, { name: 'name' }, { name: 'price' }, { name: 'stock' }] },
-      { name: 'orders', columns: [{ name: 'id' }, { name: 'user_id' }, { name: 'product_id' }, { name: 'quantity' }, { name: 'total_amount' }, { name: 'order_date' }] }
-    ];
-    
-    tableTree.value = mockTables;
+    // 调用后端API加载表结构
+    const response = await dataSourceApi.getDataSourceTables(source.id);
+    tableTree.value = response.tables;
     ElMessage.success('表结构加载成功！');
   } catch (error) {
     console.error('加载表结构失败:', error);
@@ -125,7 +118,7 @@ const loadTables = async () => {
   }
 };
 
-const startMigration = () => {
+const startMigration = async () => {
   if (!migrationTask.sourceId || !migrationTask.targetId) {
     ElMessage.warning('请选择源数据源和目标数据源');
     return;
@@ -140,40 +133,44 @@ const startMigration = () => {
     return;
   }
   
-  const task = {
-    id: Date.now(),
-    name: `迁移任务_${Date.now()}`,
-    source: migrationTask.sourceId,
-    target: migrationTask.targetId,
-    migrationType: migrationTask.migrationType.join(','),
-    tables: checkedKeys.join(','),
-    status: 'running',
-    progress: 0,
-    createTime: new Date().toLocaleString(),
-    log: []
-  };
-  
-  migrationHistory.value.push(task);
-  ElMessage.success('迁移任务已启动！');
-  
-  // 模拟迁移过程
-  simulateMigration(task);
+  try {
+    // 调用后端API创建迁移任务
+    const taskData = {
+      name: `迁移任务_${Date.now()}`,
+      source_id: dataSources.value.find(ds => ds.name === migrationTask.sourceId).id,
+      target_id: dataSources.value.find(ds => ds.name === migrationTask.targetId).id,
+      table_names: checkedKeys.join(','),
+      migrate_structure: migrationTask.migrationType.includes('结构迁移'),
+      migrate_records: migrationTask.migrationType.includes('数据迁移')
+    };
+    const response = await migrationTaskApi.createMigrationTask(taskData);
+    migrationHistory.value.push(response);
+    ElMessage.success('迁移任务已启动！');
+    
+    // 开始迁移
+    await migrationTaskApi.startMigration(response.id);
+  } catch (error) {
+    console.error('启动迁移任务失败:', error);
+    ElMessage.error('启动迁移任务失败：' + error.message);
+  }
 };
 
-const simulateMigration = async (task) => {
-  const totalSteps = 10;
-  for (let i = 0; i <= totalSteps; i++) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const progress = Math.round((i / totalSteps) * 100);
-    task.progress = progress;
-    
-    if (i % 2 === 0) {
-      task.log.push(`[${new Date().toLocaleTimeString()}] 正在执行第 ${i} 步...`);
+// 监听迁移进度
+const watchMigrationProgress = async (task) => {
+  try {
+    while (task.status === 'running') {
+      const response = await migrationTaskApi.getMigrationProgress(task.id);
+      task.progress = response.progress;
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
+    // 获取最终的迁移日志
+    const logResponse = await migrationTaskApi.getMigrationLog(task.id);
+    task.log = logResponse.log;
+    ElMessage.success('迁移任务已完成！');
+  } catch (error) {
+    console.error('获取迁移进度失败:', error);
+    ElMessage.error('获取迁移进度失败：' + error.message);
   }
-  task.status = 'completed';
-  task.log.push(`[${new Date().toLocaleTimeString()}] 迁移任务完成！`);
-  ElMessage.success('迁移任务已完成！');
 };
 
 const resetTask = () => {
@@ -190,17 +187,52 @@ const resetTask = () => {
   }
 };
 
-const viewLog = (task) => {
-  ElMessageBox.alert(
-    `<pre>${task.log.join('\n')}</pre>`,
-    `任务日志 - ${task.name}`,
-    {
-      dangerouslyUseHTMLString: true,
-      showClose: true,
-      confirmButtonText: '关闭'
-    }
-  );
+const viewLog = async (task) => {
+  try {
+    // 调用后端API获取迁移日志
+    const response = await migrationTaskApi.getMigrationLog(task.id);
+    ElMessageBox.alert(
+      `<pre>${response.log.join('\n')}</pre>`,
+      `任务日志 - ${task.name}`,
+      {
+        dangerouslyUseHTMLString: true,
+        showClose: true,
+        confirmButtonText: '关闭'
+      }
+    );
+  } catch (error) {
+    console.error('获取迁移日志失败:', error);
+    ElMessage.error('获取迁移日志失败：' + error.message);
+  }
 };
+
+// 加载数据源列表
+const loadDataSources = async () => {
+  try {
+    const response = await dataSourceApi.getDataSources();
+    dataSources.value = response;
+  } catch (error) {
+    console.error('加载数据源列表失败:', error);
+    ElMessage.error('加载数据源列表失败：' + error.message);
+  }
+};
+
+// 加载迁移任务列表
+const loadMigrationTasks = async () => {
+  try {
+    const response = await migrationTaskApi.getMigrationTasks();
+    migrationHistory.value = response;
+  } catch (error) {
+    console.error('加载迁移任务列表失败:', error);
+    ElMessage.error('加载迁移任务列表失败：' + error.message);
+  }
+};
+
+// 组件挂载时加载数据源列表和迁移任务列表
+onMounted(() => {
+  loadDataSources();
+  loadMigrationTasks();
+});
 </script>
 
 <style scoped>

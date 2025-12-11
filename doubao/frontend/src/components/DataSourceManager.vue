@@ -47,13 +47,14 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-// Mock test connection function
+import { dataSourceApi } from '../api/api';
+
+// 测试连接
 const testConnection = async () => {
   try {
-    // Simulate connection delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const response = await dataSourceApi.testConnection(dataSource);
     ElMessage.success('连接成功！');
   } catch (error) {
     console.error('连接失败:', error);
@@ -71,10 +72,7 @@ const dataSource = reactive({
   password: ''
 });
 
-const dataSources = ref([
-  // 示例数据源
-  { name: '本地MySQL', type: 'mysql', host: 'localhost', port: 3306, database: 'test', username: 'root', password: '' }
-]);
+const dataSources = ref([]);
 
 // const testConnection = async () => {
 //   try {
@@ -109,36 +107,63 @@ const dataSources = ref([
 //   }
 // };
 
-const saveDataSource = () => {
+const saveDataSource = async () => {
   if (!dataSource.name) {
     ElMessage.warning('请输入数据源名称');
     return;
   }
-  dataSources.value.push({ ...dataSource });
-  ElMessage.success('数据源保存成功！');
-  // 重置表单
-  Object.assign(dataSource, {
-    name: '',
-    type: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    database: '',
-    username: 'root',
-    password: ''
-  });
+  try {
+    const response = await dataSourceApi.createDataSource(dataSource);
+    dataSources.value.push(response);
+    ElMessage.success('数据源保存成功！');
+    // 重置表单
+    Object.assign(dataSource, {
+      name: '',
+      type: 'mysql',
+      host: 'localhost',
+      port: 3306,
+      database: '',
+      username: 'root',
+      password: ''
+    });
+  } catch (error) {
+    console.error('保存数据源失败:', error);
+    ElMessage.error('保存数据源失败：' + error.message);
+  }
 };
 
 const editDataSource = (row) => {
   Object.assign(dataSource, row);
 };
 
-const deleteDataSource = (row) => {
-  const index = dataSources.value.indexOf(row);
-  if (index > -1) {
-    dataSources.value.splice(index, 1);
-    ElMessage.success('数据源删除成功！');
+const deleteDataSource = async (row) => {
+  try {
+    await dataSourceApi.deleteDataSource(row.id);
+    const index = dataSources.value.indexOf(row);
+    if (index > -1) {
+      dataSources.value.splice(index, 1);
+      ElMessage.success('数据源删除成功！');
+    }
+  } catch (error) {
+    console.error('删除数据源失败:', error);
+    ElMessage.error('删除数据源失败：' + error.message);
   }
 };
+// 加载数据源列表
+const loadDataSources = async () => {
+  try {
+    const response = await dataSourceApi.getDataSources();
+    dataSources.value = response;
+  } catch (error) {
+    console.error('加载数据源列表失败:', error);
+    ElMessage.error('加载数据源列表失败：' + error.message);
+  }
+};
+
+// 组件挂载时加载数据源列表
+onMounted(() => {
+  loadDataSources();
+});
 </script>
 
 <style scoped>

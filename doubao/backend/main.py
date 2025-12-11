@@ -1,12 +1,25 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
 import os
+import pymysql
+import pyodbc
+import json
 
 app = FastAPI(title="数据迁移工具后端服务")
+
+# 添加CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 数据库配置 - 使用SQLite作为示例，实际使用时可配置为MySQL或SQL Server
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data_transfer.db"
@@ -153,6 +166,83 @@ def delete_data_source(source_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"id": source_id, "message": "数据源删除成功"}
 
+# 测试数据源连接
+@app.post("/api/data_sources/test_connection", response_model=dict)
+def test_connection(source: DataSourceCreate):
+    try:
+        if source.type == "mysql":
+            # 测试MySQL连接
+            connection = pymysql.connect(
+                host=source.host,
+                port=source.port,
+                user=source.username,
+                password=source.password,
+                database=source.database
+            )
+            connection.close()
+        elif source.type == "sqlserver":
+            # 测试SQL Server连接
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={source.host},{source.port};DATABASE={source.database};UID={source.username};PWD={source.password}"
+            connection = pyodbc.connect(conn_str)
+            connection.close()
+        else:
+            raise HTTPException(status_code=400, detail="不支持的数据库类型")
+        
+        return {"message": "连接成功"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"连接失败: {str(e)}")
+
+# 获取数据源表结构
+@app.get("/api/data_sources/{source_id}/tables", response_model=dict)
+def get_data_source_tables(source_id: int, db: Session = Depends(get_db)):
+    source = db.query(DataSource).filter(DataSource.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="数据源不存在")
+    
+    try:
+        tables = []
+        if source.type == "mysql":
+            # 获取MySQL表结构
+            connection = pymysql.connect(
+                host=source.host,
+                port=source.port,
+                user=source.username,
+                password=source.password,
+                database=source.database
+            )
+            cursor = connection.cursor()
+            cursor.execute("SHOW TABLES")
+            table_names = [table[0] for table in cursor.fetchall()]
+            
+            for table_name in table_names:
+                cursor.execute(f"DESCRIBE {table_name}")
+                columns = [{"name": column[0], "type": column[1]} for column in cursor.fetchall()]
+                tables.append({"name": table_name, "columns": columns})
+            
+            connection.close()
+        elif source.type == "sqlserver":
+            # 获取SQL Server表结构
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={source.host},{source.port};DATABASE={source.database};UID={source.username};PWD={source.password}"
+            connection = pyodbc.connect(conn_str)
+            cursor = connection.cursor()
+            
+            # 获取所有表名
+            cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'")
+            table_names = [table[0] for table in cursor.fetchall()]
+            
+            for table_name in table_names:
+                cursor.execute(f"SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{table_name}'")
+                columns = [{"name": column[0], "type": column[1]} for column in cursor.fetchall()]
+                tables.append({"name": table_name, "columns": columns})
+            
+            connection.close()
+        else:
+            raise HTTPException(status_code=400, detail="不支持的数据库类型")
+        
+        return {"tables": tables}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"获取表结构失败: {str(e)}")
+
 # 数据迁移任务管理API
 @app.post("/api/migration_tasks/", response_model=dict)
 def create_migration_task(task: MigrationTaskCreate, db: Session = Depends(get_db)):
@@ -271,6 +361,25 @@ def stop_migration_task(task_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(task)
     return {"id": task.id, "status": task.status, "log": task.log, "message": "迁移任务已停止"}
+
+# 获取迁移任务进度
+@app.get("/api/migration_tasks/{task_id}/progress", response_model=dict)
+def get_migration_progress(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(MigrationTask).filter(MigrationTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="迁移任务不存在")
+    
+    return {"progress": task.progress, "status": task.status}
+
+# 获取迁移任务日志
+@app.get("/api/migration_tasks/{task_id}/log", response_model=dict)
+def get_migration_log(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(MigrationTask).filter(MigrationTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="迁移任务不存在")
+    
+    log_lines = task.log.split("\n") if task.log else []
+    return {"log": log_lines}
 
 if __name__ == "__main__":
     import uvicorn
